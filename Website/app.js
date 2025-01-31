@@ -1,35 +1,31 @@
+/* app.js */
+
+// If using Fluent's dark/light mode switching:
 import { baseLayerLuminance, StandardLuminance } from 'https://unpkg.com/@fluentui/web-components';
 
+// Adjust this if your environment injects the listing URL via Mustache
 const LISTING_URL = "{{ listingInfo.Url }}";
 
-const PACKAGES = {
-{{~ for package in packages ~}}
-  "{{ package.Name }}": {
-    name: "{{ package.Name }}",
-    displayName: "{{ if package.DisplayName; package.DisplayName; end; }}",
-    description: "{{ if package.Description; package.Description; end; }}",
-    version: "{{ package.Version }}",
-    author: {
-      name: "{{ if package.Author.Name; package.Author.Name; end; }}",
-      url: "{{ if package.Author.Url; package.Author.Url; end; }}",
-    },
-    dependencies: {
-      {{~ for dependency in package.Dependencies ~}}
-        "{{ dependency.Name }}": "{{ dependency.Version }}",
-      {{~ end ~}}
-    },
-    keywords: [
-      {{~ for keyword in package.Keywords ~}}
-        "{{ keyword }}",
-      {{~ end ~}}
-    ],
-    license: "{{ package.License }}",
-    licensesUrl: "{{ package.LicensesUrl }}",
-  },
-{{~ end ~}}
-};
+/*
+  If you want to gather your package data from Mustache, you could do something like:
 
-const setTheme = () => {
+  const PACKAGES = {
+    {{~ for package in packages ~}}
+      "{{ package.Name }}": {
+        name: "{{ package.Name }}",
+        displayName: "{{ if package.DisplayName; package.DisplayName; end; }}",
+        description: "{{ if package.Description; package.Description; end; }}",
+        // ...
+        zipUrl: "{{ package.ZipUrl }}",
+      },
+    {{~ end ~}}
+  };
+
+  Or you can simply rely on the data attributes your Mustache inserted in the HTML
+  (like `data-package-id="{{ package.Name }}"`).
+*/
+
+function setTheme() {
   const isDarkTheme = () => window.matchMedia("(prefers-color-scheme: dark)").matches;
   if (isDarkTheme()) {
     baseLayerLuminance.setValueFor(document.documentElement, StandardLuminance.DarkMode);
@@ -38,194 +34,115 @@ const setTheme = () => {
   }
 }
 
-(() => {
+window.addEventListener('DOMContentLoaded', () => {
+  // If using the Fluent theming approach:
   setTheme();
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', setTheme);
 
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-    setTheme();
-  });
-
-  const packageGrid = document.getElementById('packageGrid');
-
-  const searchInput = document.getElementById('searchInput');
-  searchInput.addEventListener('input', ({ target: { value = '' }}) => {
-    const items = packageGrid.querySelectorAll('fluent-data-grid-row[row-type="default"]');
-    items.forEach(item => {
-      if (value === '') {
-        item.style.display = 'grid';
-        return;
-      }
-      if (
-        item.dataset?.packageName?.toLowerCase()?.includes(value.toLowerCase()) ||
-        item.dataset?.packageId?.toLowerCase()?.includes(value.toLowerCase())
-      ) {
-        item.style.display = 'grid';
-      } else {
-        item.style.display = 'none';
-      }
-    });
-  });
-
-  const urlBarHelpButton = document.getElementById('urlBarHelp');
-  const addListingToVccHelp = document.getElementById('addListingToVccHelp');
-  urlBarHelpButton.addEventListener('click', () => {
-    addListingToVccHelp.hidden = false;
-  });
-  const addListingToVccHelpClose = document.getElementById('addListingToVccHelpClose');
-  addListingToVccHelpClose.addEventListener('click', () => {
-    addListingToVccHelp.hidden = true;
-  });
-
-  const vccListingInfoUrlFieldCopy = document.getElementById('vccListingInfoUrlFieldCopy');
-  vccListingInfoUrlFieldCopy.addEventListener('click', () => {
-    const vccUrlField = document.getElementById('vccListingInfoUrlField');
-    vccUrlField.select();
-    navigator.clipboard.writeText(vccUrlField.value);
-    vccUrlFieldCopy.appearance = 'accent';
-    setTimeout(() => {
-      vccUrlFieldCopy.appearance = 'neutral';
-    }, 1000);
-  });
-
+  // 1) "Add listing to VCC" main button
   const vccAddRepoButton = document.getElementById('vccAddRepoButton');
-  vccAddRepoButton.addEventListener('click', () => window.location.assign(`vcc://vpm/addRepo?url=${encodeURIComponent(LISTING_URL)}`));
-
-  const vccUrlFieldCopy = document.getElementById('vccUrlFieldCopy');
-  vccUrlFieldCopy.addEventListener('click', () => {
-    const vccUrlField = document.getElementById('vccUrlField');
-    vccUrlField.select();
-    navigator.clipboard.writeText(vccUrlField.value);
-    vccUrlFieldCopy.appearance = 'accent';
-    setTimeout(() => {
-      vccUrlFieldCopy.appearance = 'neutral';
-    }, 1000);
-  });
-
-  const rowMoreMenu = document.getElementById('rowMoreMenu');
-  const hideRowMoreMenu = e => {
-    if (rowMoreMenu.contains(e.target)) return;
-    document.removeEventListener('click', hideRowMoreMenu);
-    rowMoreMenu.hidden = true;
+  if (vccAddRepoButton) {
+    vccAddRepoButton.addEventListener('click', () => {
+      window.location.assign(`vcc://vpm/addRepo?url=${encodeURIComponent(LISTING_URL)}`);
+    });
   }
 
-  const rowMenuButtons = document.querySelectorAll('.rowMenuButton');
-  rowMenuButtons.forEach(button => {
-    button.addEventListener('click', e => {
-      if (rowMoreMenu?.hidden) {
-        rowMoreMenu.style.top = `${e.clientY + e.target.clientHeight}px`;
-        rowMoreMenu.style.left = `${e.clientX - 120}px`;
-        rowMoreMenu.hidden = false;
+  // 2) Copy button on the main listing bar
+  const vccUrlFieldCopy = document.getElementById('vccUrlFieldCopy');
+  if (vccUrlFieldCopy) {
+    vccUrlFieldCopy.addEventListener('click', () => {
+      const vccUrlField = document.getElementById('vccUrlField');
+      if (!vccUrlField) return;
 
-        const downloadLink = rowMoreMenu.querySelector('#rowMoreMenuDownload');
-        const downloadListener = () => {
-          window.open(e?.target?.dataset?.packageUrl, '_blank');
-        }
-        downloadLink.addEventListener('change', () => {
-          downloadListener();
-          downloadLink.removeEventListener('change', downloadListener);
-        });
+      // If you want the fancy "Copied!" text switch:
+      const originalHtml = vccUrlFieldCopy.innerHTML;
+      vccUrlFieldCopy.innerHTML = `<img class="w-4 h-4 mr-1" src="./images/copy.svg" alt="" /> Copied!`;
 
-        setTimeout(() => {
-          document.addEventListener('click', hideRowMoreMenu);
-        }, 1);
-      }
-    });
-  });
-
-  const packageInfoModal = document.getElementById('packageInfoModal');
-  const packageInfoModalClose = document.getElementById('packageInfoModalClose');
-  packageInfoModalClose.addEventListener('click', () => {
-    packageInfoModal.hidden = true;
-  });
-
-  // Fluent dialogs use nested shadow-rooted elements, so we need to use JS to style them
-  const modalControl = packageInfoModal.shadowRoot.querySelector('.control');
-  modalControl.style.maxHeight = "90%";
-  modalControl.style.transition = 'height 0.2s ease-in-out';
-  modalControl.style.overflowY = 'hidden';
-
-  const packageInfoName = document.getElementById('packageInfoName');
-  const packageInfoId = document.getElementById('packageInfoId');
-  const packageInfoVersion = document.getElementById('packageInfoVersion');
-  const packageInfoDescription = document.getElementById('packageInfoDescription');
-  const packageInfoAuthor = document.getElementById('packageInfoAuthor');
-  const packageInfoDependencies = document.getElementById('packageInfoDependencies');
-  const packageInfoKeywords = document.getElementById('packageInfoKeywords');
-  const packageInfoLicense = document.getElementById('packageInfoLicense');
-
-  const rowAddToVccButtons = document.querySelectorAll('.rowAddToVccButton');
-  rowAddToVccButtons.forEach((button) => {
-    button.addEventListener('click', () => window.location.assign(`vcc://vpm/addRepo?url=${encodeURIComponent(LISTING_URL)}`));
-  });
-
-  const rowPackageInfoButton = document.querySelectorAll('.rowPackageInfoButton');
-  rowPackageInfoButton.forEach((button) => {
-    button.addEventListener('click', e => {
-      const packageId = e.target.dataset?.packageId;
-      const packageInfo = PACKAGES?.[packageId];
-      if (!packageInfo) {
-        console.error(`Did not find package ${packageId}. Packages available:`, PACKAGES);
-        return;
-      }
-
-      packageInfoName.textContent = packageInfo.displayName;
-      packageInfoId.textContent = packageId;
-      packageInfoVersion.textContent = `v${packageInfo.version}`;
-      packageInfoDescription.textContent = packageInfo.description;
-      packageInfoAuthor.textContent = packageInfo.author.name;
-      packageInfoAuthor.href = packageInfo.author.url;
-
-      if ((packageInfo.keywords?.length ?? 0) === 0) {
-        packageInfoKeywords.parentElement.classList.add('hidden');
-      } else {
-        packageInfoKeywords.parentElement.classList.remove('hidden');
-        packageInfoKeywords.innerHTML = null;
-        packageInfo.keywords.forEach(keyword => {
-          const keywordDiv = document.createElement('div');
-          keywordDiv.classList.add('me-2', 'mb-2', 'badge');
-          keywordDiv.textContent = keyword;
-          packageInfoKeywords.appendChild(keywordDiv);
-        });
-      }
-
-      if (!packageInfo.license?.length && !packageInfo.licensesUrl?.length) {
-        packageInfoLicense.parentElement.classList.add('hidden');
-      } else {
-        packageInfoLicense.parentElement.classList.remove('hidden');
-        packageInfoLicense.textContent = packageInfo.license ?? 'See License';
-        packageInfoLicense.href = packageInfo.licensesUrl ?? '#';
-      }
-
-      packageInfoDependencies.innerHTML = null;
-      Object.entries(packageInfo.dependencies).forEach(([name, version]) => {
-        const depRow = document.createElement('li');
-        depRow.classList.add('mb-2');
-        depRow.textContent = `${name} @ v${version}`;
-        packageInfoDependencies.appendChild(depRow);
-      });
-
-      packageInfoModal.hidden = false;
+      navigator.clipboard.writeText(vccUrlField.value);
 
       setTimeout(() => {
-        const height = packageInfoModal.querySelector('.col').clientHeight;
-        modalControl.style.setProperty('--dialog-height', `${height + 14}px`);
-      }, 1);
+        vccUrlFieldCopy.innerHTML = originalHtml;
+      }, 2000);
+    });
+  }
+
+  // 3) “How to add to VCC” dialog
+  const urlBarHelp = document.getElementById('urlBarHelp');
+  const addListingToVccHelp = document.getElementById('addListingToVccHelp');
+  const addListingToVccHelpClose = document.getElementById('addListingToVccHelpClose');
+  if (urlBarHelp && addListingToVccHelp) {
+    urlBarHelp.addEventListener('click', () => { addListingToVccHelp.hidden = false; });
+    addListingToVccHelpClose?.addEventListener('click', () => {
+      addListingToVccHelp.hidden = true;
+    });
+  }
+
+  // 4) Copy button inside the help dialog
+  const vccListingInfoUrlFieldCopy = document.getElementById('vccListingInfoUrlFieldCopy');
+  if (vccListingInfoUrlFieldCopy) {
+    vccListingInfoUrlFieldCopy.addEventListener('click', () => {
+      const vccUrlField = document.getElementById('vccListingInfoUrlField');
+      if (!vccUrlField) return;
+      vccUrlField.select();
+      navigator.clipboard.writeText(vccUrlField.value);
+      vccListingInfoUrlFieldCopy.appearance = 'accent';
+      setTimeout(() => {
+        vccListingInfoUrlFieldCopy.appearance = 'neutral';
+      }, 1000);
+    });
+  }
+
+  // 5) Search field logic
+  const searchInput = document.getElementById('searchInput');
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      const value = e.target.value.toLowerCase();
+      const packageRows = document.querySelectorAll('#packages > div[data-package-id]');
+      packageRows.forEach(row => {
+        const name = row.dataset.packageName.toLowerCase() || '';
+        const id   = row.dataset.packageId.toLowerCase()   || '';
+        // Show/hide if either matches search
+        if (value === '' || name.includes(value) || id.includes(value)) {
+          row.style.display = 'grid'; // or 'flex'; we’re using Tailwind’s grid
+        } else {
+          row.style.display = 'none';
+        }
+      });
+    });
+  }
+
+  // 6) Per-package "Add to VCC" button
+  const rowAddToVccButtons = document.querySelectorAll('.rowAddToVccButton');
+  rowAddToVccButtons.forEach(button => {
+    button.addEventListener('click', (e) => {
+      // Example: You might use the *package-specific* listing .json if you want:
+      //  vcc://vpm/addRepo?url=encodeURI(.../packageId.json)
+      // Or you can always just add the top-level listing:
+      window.location.assign(`vcc://vpm/addRepo?url=${encodeURIComponent(LISTING_URL)}`);
     });
   });
 
-  const packageInfoVccUrlFieldCopy = document.getElementById('packageInfoVccUrlFieldCopy');
-  packageInfoVccUrlFieldCopy.addEventListener('click', () => {
-    const vccUrlField = document.getElementById('packageInfoVccUrlField');
-    vccUrlField.select();
-    navigator.clipboard.writeText(vccUrlField.value);
-    vccUrlFieldCopy.appearance = 'accent';
-    setTimeout(() => {
-      vccUrlFieldCopy.appearance = 'neutral';
-    }, 1000);
+  // 7) “Info” button modals (if you want them)
+  const rowPackageInfoButton = document.querySelectorAll('.rowPackageInfoButton');
+  rowPackageInfoButton.forEach(button => {
+    button.addEventListener('click', (e) => {
+      const pkgId = e.currentTarget.dataset.packageId;
+      console.log("Clicked info for package:", pkgId);
+      // If you want a modal, you can open a Fluent dialog, fill in data, etc.
+      // For now, just a console log or a custom approach:
+    });
   });
 
-  const packageInfoListingHelp = document.getElementById('packageInfoListingHelp');
-  packageInfoListingHelp.addEventListener('click', () => {
-    addListingToVccHelp.hidden = false;
+  // 8) “Download ZIP” or “More” button
+  const rowMenuButtons = document.querySelectorAll('.rowMenuButton');
+  rowMenuButtons.forEach(button => {
+    button.addEventListener('click', (e) => {
+      const zipUrl = e.currentTarget.dataset.packageUrl;
+      if (!zipUrl) {
+        alert("No zip URL provided");
+        return;
+      }
+      window.open(zipUrl, '_blank');
+    });
   });
-})();
+});
