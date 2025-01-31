@@ -21,7 +21,7 @@
             "name":"com.vrchat.udonsharp",
             "displayName": "UdonSharp",
             "description": "Awesome package",
-            "releases":[
+            "release":[
                 "https://github.com/vrchat-community/UdonSharp/releases/download/1.1.7/com.vrchat.UdonSharp.zip",
                 "https://github.com/vrchat-community/UdonSharp/releases/download/1.1.6/com.vrchat.UdonSharp-1.1.6.zip"
             ]
