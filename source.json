@@ -18,7 +18,7 @@
     ],
     "packages":[
         {
-            "name":"com.vrchat.udonsharp",
+            "id": "com.vrchat.udonsharp",
             "displayName": "UdonSharp",
             "description": "Awesome package",
             "release":[
