@@ -7,12 +7,11 @@
         "name":"VRChat",
         "url":"https://hello.vrchat.com"
     },
-    "description":"lexibaddie's VRChat Creator Companion Listings",
+    "description":"VRChat Creator Companion Listings",
     "infoLink":{
         "url":"http://github.com/alexybaddie/vcc",
         "text":"View on GitHub"
     },
-    "bannerUrl":"banner.png",
     "githubRepos":[
         "vrchat-community/clientsim"
     ],
